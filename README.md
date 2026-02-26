@@ -1,150 +1,117 @@
-# Production Machine Failure Prediction
+# Machine Failure Prediction (Predictive Maintenance)
 
 ## Problem Statement
 
-This project focuses on building and comparing multiple machine learning models to predict the failure of steel production machines. The objective is to predict a binary target variable based on a set of operational and sensor data sourced from the production plant.
+Unplanned machine failures in industrial settings (e.g., manufacturing or oil & gas plants) lead to costly downtime and maintenance overhead.
+The objective of this project is to build a **predictive maintenance model** that can **identify potential machine failures in advance** using sensor data, with a strong emphasis on **detecting rare failure events**.
 
-A key challenge in this problem is the severe class imbalance present in the training data, which makes naive modeling approaches and standard accuracy-based evaluation unreliable.
-
-The final goal is to generate predictions for an unseen test dataset that does not contain target labels.
-
----
-
-## Dataset Overview
-
-The project uses two datasets:
-
-- `train.csv`
-- `test.csv`
-
-### Training Data
-
-- Contains feature columns and a binary target variable
-- Target distribution is highly imbalanced:
-  - Approximately 98.4% class 0
-  - Approximately 1.6% class 1
-- This imbalance strongly influences model selection, validation strategy, and metric choice
-
-### Test Data
-
-- Contains the same feature columns as the training data
-- Does not contain the target variable
-- Used strictly for inference after model selection and training
-- No evaluation metrics can be computed on this dataset
+Given the highly imbalanced nature of the data (~97% non-failure vs ~3% failure), the problem is framed as a **rare-event binary classification task**, where **missing failures (false negatives)** is more costly than triggering extra inspections (false positives).
 
 ---
 
-## Key Challenges
+## Dataset Description
 
-- Extreme class imbalance in the target variable
-- Accuracy is not a meaningful evaluation metric
-- Test data has no labels, requiring careful validation using training data only
-- Need for fair model comparison without data leakage
+### Source
+
+The dataset used is the [**AI4I 2020 Predictive Maintenance Dataset**](https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset), sourced from **UCI Machine Learning Repository.</br>
+This is a widely used public benchmark for predictive maintenance tasks.
+
+---
+
+### Columns Overview
+
+| Column                  | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| UDI                     | Unique row identifier                         |
+| Product ID              | Machine / product identifier                  |
+| Type                    | Product quality category (L, M, H)            |
+| Air temperature [K]     | Ambient temperature                           |
+| Process temperature [K] | Internal process temperature                  |
+| Rotational speed [rpm]  | Machine rotational speed                      |
+| Torque [Nm]             | Applied torque                                |
+| Tool wear [min]         | Tool usage time                               |
+| Machine failure         | Target variable (1 = failure, 0 = no failure) |
+| TWF                     | Tool Wear Failure                             |
+| HDF                     | Heat Dissipation Failure                      |
+| PWF                     | Power Failure                                 |
+| OSF                     | Overstrain Failure                            |
+| RNF                     | Random Failure                                |
+
+> Note: The individual failure-type columns were **excluded from modeling** to prevent target leakage.
 
 ---
 
 ## Preprocessing Summary
 
-- Selected continuous numerical features were scaled using `StandardScaler`
-- Ordinal categorical features were encoded but not scaled
-- Feature and target separation was performed before any scaling
-- Scaling parameters were learned only from training data and reused for test data
-- Column names were sanitized to ensure compatibility with all models, especially XGBoost
+* Dropped identifier columns (`UDI`, `Product ID`)
+* Encoded categorical feature `Type`
+* Renamed columns for consistency and modeling convenience
+* Used **stratified train–test split** to preserve failure distribution
+* Applied **feature scaling** where required (for linear models)
+* Ensured **no data leakage** by fitting preprocessing steps only on training data
 
 ---
 
-## Validation Strategy
+## Models Trained & Training Approach
 
-To ensure robust and unbiased evaluation under class imbalance:
+The following models were trained and compared using a **consistent evaluation pipeline**:
 
-- Stratified cross-validation was used throughout
-- Each fold preserved the original class distribution
-- This prevented folds with missing or extremely rare positive samples
+### Models
 
----
+* Logistic Regression (baseline, class-weighted)
+* Random Forest
+* LightGBM
 
-## Models Trained
+### Training Technique
 
-The following models were trained and evaluated:
-
-### Logistic Regression
-
-- Used as a strong baseline model
-- Class imbalance handled using `class_weight="balanced"`
-- Sensitive to feature scaling
-- Provides interpretable coefficients
-
-### Random Forest Classifier
-
-- Tree-based ensemble model
-- Naturally handles non-linear relationships
-- Class imbalance handled using `class_weight="balanced"`
-- Feature scaling not required
-
-### XGBoost Classifier
-
-- Gradient boosting based tree ensemble
-- Designed for high-performance tabular modeling
-- Class imbalance handled using `scale_pos_weight`
-- Feature scaling not required but allowed
-- Strong ranking performance under imbalance
-
----
-
-## Hyperparameter Tuning
-
-- Hyperparameters were optimized using `GridSearchCV`
-- Stratified cross-validation was used during tuning
-- Each model was tuned independently
-- Only training data was used during hyperparameter selection
+* **Stratified K-Fold Cross-Validation (5 folds)**
+* Hyperparameter tuning using `GridSearchCV`
+* Model selection optimized using **PR-AUC**
+* Final predictions generated using **probability threshold tuning** to align with operational objectives
 
 ---
 
 ## Evaluation Metrics
 
-Due to the extreme class imbalance, accuracy was not used as a primary evaluation metric.
+Given the severe class imbalance, traditional accuracy was avoided.
 
-The following metrics were used:
+Primary metrics used:
 
-- **ROC-AUC**
-  - Primary metric for model selection
-  - Measures ranking quality across all decision thresholds
-- **F1 Score**
-  - Reported to evaluate the balance between precision and recall
-  - Computed using cross-validated estimates
+* **PR-AUC (Precision–Recall AUC)** – model discrimination under imbalance
+* **Recall (Failure class)** – ability to detect failures
+* **Precision (Failure class)** – false alarm control
+* **F1-score** – balance between precision and recall
 
-Each model was optimized using ROC-AUC and then evaluated using both ROC-AUC and F1 score for comparison.
-
-![Training Performance of the models](training/training-model-performance.png)
-
-_**NOTE**_: This isn't the final model performance since that requires the actual target values in `test.csv`, which this dataset didn't have.
+![Scores across each model](Screenshots/scores.png)
 
 ---
 
-## Model Performance Summary
+## Performance Summary
 
-All models demonstrated strong ranking ability with high ROC-AUC values, indicating that meaningful signal was learned despite the imbalance.
+| Model               | PR-AUC  | Recall         | Precision |
+| ------------------- | ------- | -------------- | --------- |
+| Logistic Regression | Low     | High           | Low       |
+| Random Forest       | Medium  | Highest        | Moderate  |
+| LightGBM            | Highest | Slightly Lower | Highest   |
 
-Logistic Regression achieved the highest F1 score under the default threshold, while Random Forest and XGBoost achieved superior ranking performance but lower F1 scores, highlighting the need for threshold tuning in ensemble models.
-
----
-
-## Final Inference
-
-- The best estimator for each model was refit on the full training dataset
-- Trained models were applied to the test dataset
-- Predictions and predicted probabilities were stored in a structured DataFrame
-- No evaluation metrics were computed on the test set due to missing labels
+* Logistic Regression produced a **pessimistic model** with many false positives.
+* Random Forest improved balance by capturing **non-linear relationships**.
+* LightGBM delivered the **best overall performance**, achieving strong precision while maintaining acceptable recall.
 
 ---
 
-## Key Takeaways
+## Key Inferences & Takeaways
 
-- Severe class imbalance requires careful metric selection
-- Stratified cross-validation is essential for reliable evaluation
-- ROC-AUC is effective for model selection under imbalance
-- F1 score provides complementary insight into classification performance
-- High ROC-AUC with lower F1 is expected without threshold tuning
-- Test data must be treated strictly as unseen data for inference
+* **Model evaluation matters as much as model choice** in imbalanced classification problems.
+* High recall with low precision reflects a **conservative failure-detection policy**, not a weak model.
+* Tree-based models outperform linear models due to **non-linear sensor interactions**.
+* **LightGBM emerged as the most suitable model** when balancing failure detection and operational efficiency.
+* Threshold tuning is an **operational decision**, not a form of cheating, and is essential in predictive maintenance use cases.
 
 ---
+
+## Final Outcome
+
+This project demonstrates an **end-to-end predictive maintenance pipeline**, from data understanding to model evaluation and interpretation, highlighting how different modeling strategies impact the precision–recall tradeoff in rare-event prediction.
+
+The final solution emphasizes **business-aligned metrics**, **honest evaluation**, and **model interpretability**, making it suitable as both a portfolio project and a real-world reference.
