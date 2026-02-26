@@ -1,0 +1,24 @@
+Assumptions Made
+
+- The dataset is assumed to be a reasonable proxy for real industrial sensor data, despite being synthetic.
+- Machine failures are treated as independent binary events, without explicitly modeling temporal dependencies.
+- All sensor readings are assumed to be available and reliable at prediction time, with no missing or delayed signals.
+- The cost of a false negative (missed failure) is assumed to be significantly higher than the cost of a false positive (unnecessary inspection).
+- The failure distribution observed in the dataset is assumed to be representative of future operating conditions.
+
+Assumptions Made
+
+- The dataset is assumed to be a reasonable proxy for real industrial sensor data, despite being synthetic.
+- Machine failures are treated as independent binary events, without explicitly modeling temporal dependencies.
+- All sensor readings are assumed to be available and reliable at prediction time, with no missing or delayed signals.
+- The cost of a false negative (missed failure) is assumed to be significantly higher than the cost of a false positive (unnecessary inspection).
+- The failure distribution observed in the dataset is assumed to be representative of future operating conditions.
+
+Improvements for Production Deployment
+
+- Incorporate time-series modeling (e.g., rolling windows, trend features) to capture degradation patterns over time.
+- Introduce cost-sensitive optimization, explicitly modeling the financial impact of false positives and false negatives.
+- Perform regular model recalibration to handle data drift and changing failure behavior.
+- Add explainability tools (e.g., SHAP) to support root-cause analysis and operator trust.
+- Integrate the model with real-time monitoring systems and establish alert thresholds based on operational capacity.
+- Expand evaluation to include stability and robustness testing across different operating regimes.
